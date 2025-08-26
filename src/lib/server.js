@@ -481,7 +481,7 @@ server.tool(
 
 server.tool(
     "click_at_coordinates",
-    "clicks at specific x,y coordinates on the viewport",
+    "clicks at specific x,y coordinates on the viewport with visual feedback",
     {
         x: z.number().describe("X coordinate (horizontal position in pixels)"),
         y: z.number().describe("Y coordinate (vertical position in pixels)"),
@@ -519,6 +519,34 @@ server.tool(
                 }
             }
             
+            // Show click target indicator
+            await driver.executeScript(`
+                // Remove any existing click indicators
+                const existingIndicators = document.querySelectorAll('.mcp-click-indicator, .mcp-click-confirmation');
+                existingIndicators.forEach(indicator => indicator.remove());
+                
+                // Create click target indicator
+                const indicator = document.createElement('div');
+                indicator.className = 'mcp-click-indicator';
+                indicator.style.cssText = \`
+                    position: fixed;
+                    left: \${${x} - 10}px;
+                    top: \${${y} - 10}px;
+                    width: 20px;
+                    height: 20px;
+                    border: 2px solid red;
+                    border-radius: 50%;
+                    z-index: 2147483647;
+                    pointer-events: none;
+                    background: rgba(255, 0, 0, 0.2);
+                    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+                \`;
+                document.body.appendChild(indicator);
+            `, x, y);
+            
+            // Human visibility delay (300ms) to see the click indicator
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
             const actions = driver.actions({ bridge: true });
             
             if (relative_to === "viewport") {
@@ -545,10 +573,50 @@ server.tool(
                     .perform();
             }
             
+            // Show click confirmation flash
+            await driver.executeScript(`
+                // Create click confirmation flash
+                const confirmation = document.createElement('div');
+                confirmation.className = 'mcp-click-confirmation';
+                confirmation.style.cssText = \`
+                    position: fixed;
+                    left: \${${x} - 15}px;
+                    top: \${${y} - 15}px;
+                    width: 30px;
+                    height: 30px;
+                    border: 3px solid green;
+                    border-radius: 50%;
+                    z-index: 2147483647;
+                    pointer-events: none;
+                    background: rgba(0, 255, 0, 0.3);
+                    box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+                \`;
+                document.body.appendChild(confirmation);
+            `, x, y);
+            
+            // Brief flash to confirm click (100ms)
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Clean up all indicators
+            await driver.executeScript(`
+                const indicators = document.querySelectorAll('.mcp-click-indicator, .mcp-click-confirmation');
+                indicators.forEach(indicator => indicator.remove());
+            `);
+            
             return {
-                content: [{ type: 'text', text: `Clicked at coordinates (${x}, ${y}) relative to ${relative_to}` }]
+                content: [{ type: 'text', text: `Clicked at coordinates (${x}, ${y}) relative to ${relative_to} with visual feedback` }]
             };
         } catch (e) {
+            // Clean up indicators on error
+            try {
+                await driver.executeScript(`
+                    const indicators = document.querySelectorAll('.mcp-click-indicator, .mcp-click-confirmation');
+                    indicators.forEach(indicator => indicator.remove());
+                `);
+            } catch (cleanupError) {
+                // Ignore cleanup errors
+            }
+            
             return {
                 content: [{ type: 'text', text: `Error clicking at coordinates: ${e.message}` }]
             };
@@ -622,13 +690,11 @@ server.tool(
     "captures a screenshot with coordinate grid overlay for visual reference",
     {
         grid_spacing: z.number().optional().default(50).describe("Pixels between grid lines"),
-        show_coordinates: z.boolean().optional().default(true).describe("Show coordinate labels at grid intersections"),
-        highlight_clickables: z.boolean().optional().default(true).describe("Highlight interactive elements with colored borders"),
-        number_elements: z.boolean().optional().default(false).describe("Add numbers to clickable elements"),
+        target_identification_mode: z.enum(["coordinates", "highlights"]).optional().default("coordinates").describe("Mode for target identification: 'coordinates' shows grid with coordinate labels, 'highlights' shows red outlines around clickables"),
         outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data."),
         scale: z.number().optional().default(0.5).describe("Scale percentage for resizing the image (default 0.5 = 50%)")
     },
-    async ({ grid_spacing = 50, show_coordinates = true, highlight_clickables = true, number_elements = false, outputPath, scale = 0.5 }) => {
+    async ({ grid_spacing = 50, target_identification_mode = "coordinates", outputPath, scale = 0.5 }) => {
         try {
             const driver = getDriver();
             
@@ -658,6 +724,9 @@ server.tool(
                 const viewportWidth = window.innerWidth;
                 const viewportHeight = window.innerHeight;
                 
+                const showCoordinates = ${target_identification_mode === "coordinates"};
+                const highlightClickables = ${target_identification_mode === "highlights"};
+                
                 // Add vertical grid lines - ensure they fill the entire viewport
                 for (let x = 0; x <= viewportWidth; x += ${grid_spacing}) {
                     const vLine = document.createElement('div');
@@ -667,17 +736,14 @@ server.tool(
                         top: 0;
                         width: 2px;
                         height: 100vh;
-                        background: linear-gradient(to bottom, 
-                            rgba(0, 0, 255, 0.6) 0%, 
-                            rgba(255, 255, 255, 0.8) 50%, 
-                            rgba(0, 0, 0, 0.6) 100%);
+                        background: rgba(0, 0, 255, 0.6);
                         border-left: 1px solid rgba(255, 255, 255, 0.8);
                         border-right: 1px solid rgba(0, 0, 0, 0.6);
                     \`;
                     gridOverlay.appendChild(vLine);
                     
                     // Add coordinate labels for major grid lines
-                    if (${show_coordinates} && x % (${grid_spacing} * 2) === 0) {
+                    if (showCoordinates && x % (${grid_spacing} * 2) === 0) {
                         const label = document.createElement('div');
                         label.style.cssText = \`
                             position: absolute;
@@ -708,17 +774,14 @@ server.tool(
                         top: \${y}px;
                         width: 100vw;
                         height: 2px;
-                        background: linear-gradient(to right, 
-                            rgba(0, 0, 255, 0.6) 0%, 
-                            rgba(255, 255, 255, 0.8) 50%, 
-                            rgba(0, 0, 0, 0.6) 100%);
+                        background: rgba(0, 0, 255, 0.6);
                         border-top: 1px solid rgba(255, 255, 255, 0.8);
                         border-bottom: 1px solid rgba(0, 0, 0, 0.6);
                     \`;
                     gridOverlay.appendChild(hLine);
                     
                     // Add coordinate labels for major grid lines (including y:0)
-                    if (${show_coordinates} && y % (${grid_spacing} * 2) === 0) {
+                    if (showCoordinates && y % (${grid_spacing} * 2) === 0) {
                         const label = document.createElement('div');
                         label.style.cssText = \`
                             position: absolute;
@@ -735,35 +798,14 @@ server.tool(
                             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
                             z-index: 2147483647;
                         \`;
-                        label.textContent = 'y:' + y;
+                        // Make origin label exactly like normal case labels, just with different content
+                        label.textContent = (y === 0) ? 'x:0, y:0' : 'y:' + y;
                         gridOverlay.appendChild(label);
                     }
                 }
                 
-                // Add special origin label at (0,0) showing both coordinates
-                if (${show_coordinates}) {
-                    const originLabel = document.createElement('div');
-                    originLabel.style.cssText = \`
-                        position: absolute;
-                        left: 4px;
-                        top: 20px;
-                        color: #000;
-                        font-weight: bold;
-                        background: rgba(255, 255, 0, 0.95);
-                        border: 2px solid rgba(255, 0, 0, 0.8);
-                        padding: 3px 8px;
-                        border-radius: 4px;
-                        font-size: 12px;
-                        text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
-                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-                        z-index: 2147483647;
-                    \`;
-                    originLabel.textContent = 'x:0, y:0';
-                    gridOverlay.appendChild(originLabel);
-                }
-                
                 // Highlight clickable elements if requested
-                if (${highlight_clickables}) {
+                if (highlightClickables) {
                     const clickableSelector = 'a, button, input[type="button"], input[type="submit"], [onclick], [role="button"], [tabindex]:not([tabindex="-1"]), select, textarea, input:not([type="hidden"])';
                     const clickables = document.querySelectorAll(clickableSelector);
                     
@@ -802,31 +844,6 @@ server.tool(
                             \`;
                             centerLabel.textContent = \`center: (\${centerX},\${centerY})\`;
                             document.body.appendChild(centerLabel);
-                            
-                            // Add element numbers if requested
-                            if (${number_elements}) {
-                                const numberLabel = document.createElement('div');
-                                numberLabel.className = 'mcp-element-number';
-                                numberLabel.style.cssText = \`
-                                    position: absolute;
-                                    left: \${rect.left + window.scrollX - 15}px;
-                                    top: \${rect.top + window.scrollY - 15}px;
-                                    background: red;
-                                    color: white;
-                                    border-radius: 50%;
-                                    width: 20px;
-                                    height: 20px;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    font-size: 10px;
-                                    font-weight: bold;
-                                    z-index: 2147483645;
-                                    pointer-events: none;
-                                \`;
-                                numberLabel.textContent = index + 1;
-                                document.body.appendChild(numberLabel);
-                            }
                         }
                     });
                 }
@@ -837,6 +854,9 @@ server.tool(
             
             // Inject the grid overlay
             await driver.executeScript(gridOverlayScript);
+            
+            // Human visibility delay - let user see the grid
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             // Take screenshot with grid overlay
             const screenshot = await driver.takeScreenshot();
@@ -887,10 +907,6 @@ server.tool(
                 const centerLabels = document.querySelectorAll('.mcp-center-label');
                 centerLabels.forEach(label => label.remove());
                 
-                // Remove element number labels
-                const numberLabels = document.querySelectorAll('.mcp-element-number');
-                numberLabels.forEach(label => label.remove());
-                
                 return true;
             `;
             
@@ -902,7 +918,7 @@ server.tool(
                 return {
                     content: [{ 
                         type: 'text', 
-                        text: `Grid screenshot saved to ${outputPath} (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements}, scale: ${Math.round(scale * 100)}%)` 
+                        text: `Grid screenshot saved to ${outputPath} (grid_spacing: ${grid_spacing}px, mode: ${target_identification_mode}, scale: ${Math.round(scale * 100)}%)` 
                     }]
                 };
             } else {
@@ -910,7 +926,7 @@ server.tool(
                     content: [
                         { 
                             type: 'text', 
-                            text: `Grid screenshot captured (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements}, scale: ${Math.round(scale * 100)}%):` 
+                            text: `Grid screenshot captured (grid_spacing: ${grid_spacing}px, mode: ${target_identification_mode}, scale: ${Math.round(scale * 100)}%):` 
                         },
                         { type: 'text', text: finalScreenshot }
                     ]
