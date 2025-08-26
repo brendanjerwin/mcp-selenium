@@ -480,6 +480,73 @@ server.tool(
 );
 
 server.tool(
+    "click_at_coordinates",
+    "clicks at specific x,y coordinates on the viewport",
+    {
+        x: z.number().describe("X coordinate (horizontal position in pixels)"),
+        y: z.number().describe("Y coordinate (vertical position in pixels)"),
+        relative_to: z.enum(["viewport", "center"]).optional().default("viewport").describe("Coordinate reference point"),
+        scroll_if_needed: z.boolean().optional().default(true).describe("Auto-scroll if coordinates are outside viewport")
+    },
+    async ({ x, y, relative_to = "viewport", scroll_if_needed = true }) => {
+        try {
+            const driver = getDriver();
+            
+            // Validate coordinates are non-negative for viewport mode
+            if (relative_to === "viewport" && (x < 0 || y < 0)) {
+                throw new Error("Viewport coordinates must be non-negative");
+            }
+            
+            // Get viewport dimensions to validate bounds
+            const viewportSize = await driver.executeScript(`
+                return {
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                };
+            `);
+            
+            // For viewport mode, check if coordinates are within bounds
+            if (relative_to === "viewport") {
+                if (x > viewportSize.width || y > viewportSize.height) {
+                    if (scroll_if_needed) {
+                        // Auto-scroll to bring coordinates into view
+                        const scrollX = Math.max(0, x - viewportSize.width / 2);
+                        const scrollY = Math.max(0, y - viewportSize.height / 2);
+                        await driver.executeScript(`window.scrollTo(${scrollX}, ${scrollY})`);
+                    } else {
+                        throw new Error(`Coordinates (${x}, ${y}) are outside viewport bounds (${viewportSize.width}x${viewportSize.height})`);
+                    }
+                }
+            }
+            
+            const actions = driver.actions({ bridge: true });
+            
+            if (relative_to === "viewport") {
+                // Click at absolute viewport coordinates using move with offset
+                await actions
+                    .move({ x: x, y: y })
+                    .click()
+                    .perform();
+            } else {
+                // Click relative to viewport center
+                await actions
+                    .move({ x: x, y: y })
+                    .click()
+                    .perform();
+            }
+            
+            return {
+                content: [{ type: 'text', text: `Clicked at coordinates (${x}, ${y}) relative to ${relative_to}` }]
+            };
+        } catch (e) {
+            return {
+                content: [{ type: 'text', text: `Error clicking at coordinates: ${e.message}` }]
+            };
+        }
+    }
+);
+
+server.tool(
     "take_screenshot",
     "captures a screenshot of the current page",
     {
@@ -506,6 +573,213 @@ server.tool(
         } catch (e) {
             return {
                 content: [{ type: 'text', text: `Error taking screenshot: ${e.message}` }]
+            };
+        }
+    }
+);
+
+server.tool(
+    "take_grid_screenshot",
+    "captures a screenshot with coordinate grid overlay for visual reference",
+    {
+        grid_spacing: z.number().optional().default(50).describe("Pixels between grid lines"),
+        show_coordinates: z.boolean().optional().default(true).describe("Show coordinate labels at grid intersections"),
+        highlight_clickables: z.boolean().optional().default(true).describe("Highlight interactive elements with colored borders"),
+        number_elements: z.boolean().optional().default(false).describe("Add numbers to clickable elements"),
+        outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data.")
+    },
+    async ({ grid_spacing = 50, show_coordinates = true, highlight_clickables = true, number_elements = false, outputPath }) => {
+        try {
+            const driver = getDriver();
+            
+            // Inject JavaScript to create grid overlay
+            const gridOverlayScript = `
+                // Remove any existing grid overlay
+                const existingOverlay = document.getElementById('mcp-grid-overlay');
+                if (existingOverlay) {
+                    existingOverlay.remove();
+                }
+                
+                // Create main grid overlay container
+                const gridOverlay = document.createElement('div');
+                gridOverlay.id = 'mcp-grid-overlay';
+                gridOverlay.style.cssText = \`
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    z-index: 999999;
+                    font-family: monospace;
+                    font-size: 10px;
+                \`;
+                
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Add vertical grid lines
+                for (let x = 0; x <= viewportWidth; x += ${grid_spacing}) {
+                    const vLine = document.createElement('div');
+                    vLine.style.cssText = \`
+                        position: absolute;
+                        left: \${x}px;
+                        top: 0;
+                        width: 1px;
+                        height: 100%;
+                        background: rgba(0, 0, 255, 0.3);
+                    \`;
+                    gridOverlay.appendChild(vLine);
+                    
+                    // Add coordinate labels for major grid lines
+                    if (${show_coordinates} && x % (${grid_spacing} * 2) === 0) {
+                        const label = document.createElement('div');
+                        label.style.cssText = \`
+                            position: absolute;
+                            left: \${x + 2}px;
+                            top: 2px;
+                            color: blue;
+                            font-weight: bold;
+                            background: rgba(255, 255, 255, 0.8);
+                            padding: 1px 3px;
+                            border-radius: 2px;
+                            font-size: 10px;
+                        \`;
+                        label.textContent = x;
+                        gridOverlay.appendChild(label);
+                    }
+                }
+                
+                // Add horizontal grid lines
+                for (let y = 0; y <= viewportHeight; y += ${grid_spacing}) {
+                    const hLine = document.createElement('div');
+                    hLine.style.cssText = \`
+                        position: absolute;
+                        left: 0;
+                        top: \${y}px;
+                        width: 100%;
+                        height: 1px;
+                        background: rgba(0, 0, 255, 0.3);
+                    \`;
+                    gridOverlay.appendChild(hLine);
+                    
+                    // Add coordinate labels for major grid lines
+                    if (${show_coordinates} && y % (${grid_spacing} * 2) === 0 && y > 0) {
+                        const label = document.createElement('div');
+                        label.style.cssText = \`
+                            position: absolute;
+                            left: 2px;
+                            top: \${y + 2}px;
+                            color: blue;
+                            font-weight: bold;
+                            background: rgba(255, 255, 255, 0.8);
+                            padding: 1px 3px;
+                            border-radius: 2px;
+                            font-size: 10px;
+                        \`;
+                        label.textContent = y;
+                        gridOverlay.appendChild(label);
+                    }
+                }
+                
+                // Highlight clickable elements if requested
+                if (${highlight_clickables}) {
+                    const clickableSelector = 'a, button, input[type="button"], input[type="submit"], [onclick], [role="button"], [tabindex]:not([tabindex="-1"]), select, textarea, input:not([type="hidden"])';
+                    const clickables = document.querySelectorAll(clickableSelector);
+                    
+                    clickables.forEach((el, index) => {
+                        // Only highlight visible elements
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0) {
+                            const originalOutline = el.style.outline;
+                            el.style.outline = '2px solid rgba(255, 0, 0, 0.7)';
+                            el.setAttribute('data-mcp-original-outline', originalOutline);
+                            
+                            // Add element numbers if requested
+                            if (${number_elements}) {
+                                const numberLabel = document.createElement('div');
+                                numberLabel.className = 'mcp-element-number';
+                                numberLabel.style.cssText = \`
+                                    position: absolute;
+                                    left: \${rect.left + window.scrollX - 15}px;
+                                    top: \${rect.top + window.scrollY - 15}px;
+                                    background: red;
+                                    color: white;
+                                    border-radius: 50%;
+                                    width: 20px;
+                                    height: 20px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 10px;
+                                    font-weight: bold;
+                                    z-index: 1000000;
+                                    pointer-events: none;
+                                \`;
+                                numberLabel.textContent = index + 1;
+                                document.body.appendChild(numberLabel);
+                            }
+                        }
+                    });
+                }
+                
+                document.body.appendChild(gridOverlay);
+                return true;
+            `;
+            
+            // Inject the grid overlay
+            await driver.executeScript(gridOverlayScript);
+            
+            // Take screenshot with grid overlay
+            const screenshot = await driver.takeScreenshot();
+            
+            // Clean up the grid overlay and element highlighting
+            const cleanupScript = `
+                // Remove grid overlay
+                const gridOverlay = document.getElementById('mcp-grid-overlay');
+                if (gridOverlay) {
+                    gridOverlay.remove();
+                }
+                
+                // Remove element highlighting
+                const highlightedElements = document.querySelectorAll('[data-mcp-original-outline]');
+                highlightedElements.forEach(el => {
+                    el.style.outline = el.getAttribute('data-mcp-original-outline');
+                    el.removeAttribute('data-mcp-original-outline');
+                });
+                
+                // Remove element number labels
+                const numberLabels = document.querySelectorAll('.mcp-element-number');
+                numberLabels.forEach(label => label.remove());
+                
+                return true;
+            `;
+            
+            await driver.executeScript(cleanupScript);
+            
+            if (outputPath) {
+                const fs = await import('fs');
+                await fs.promises.writeFile(outputPath, screenshot, 'base64');
+                return {
+                    content: [{ 
+                        type: 'text', 
+                        text: `Grid screenshot saved to ${outputPath} (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements})` 
+                    }]
+                };
+            } else {
+                return {
+                    content: [
+                        { 
+                            type: 'text', 
+                            text: `Grid screenshot captured (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements}):` 
+                        },
+                        { type: 'text', text: screenshot }
+                    ]
+                };
+            }
+        } catch (e) {
+            return {
+                content: [{ type: 'text', text: `Error taking grid screenshot: ${e.message}` }]
             };
         }
     }
