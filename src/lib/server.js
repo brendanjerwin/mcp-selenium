@@ -658,7 +658,7 @@ server.tool(
                 const viewportWidth = window.innerWidth;
                 const viewportHeight = window.innerHeight;
                 
-                // Add vertical grid lines
+                // Add vertical grid lines - ensure they fill the entire viewport
                 for (let x = 0; x <= viewportWidth; x += ${grid_spacing}) {
                     const vLine = document.createElement('div');
                     vLine.style.cssText = \`
@@ -666,7 +666,7 @@ server.tool(
                         left: \${x}px;
                         top: 0;
                         width: 2px;
-                        height: 100%;
+                        height: 100vh;
                         background: linear-gradient(to bottom, 
                             rgba(0, 0, 255, 0.6) 0%, 
                             rgba(255, 255, 255, 0.8) 50%, 
@@ -699,14 +699,14 @@ server.tool(
                     }
                 }
                 
-                // Add horizontal grid lines
+                // Add horizontal grid lines - ensure they fill the entire viewport
                 for (let y = 0; y <= viewportHeight; y += ${grid_spacing}) {
                     const hLine = document.createElement('div');
                     hLine.style.cssText = \`
                         position: absolute;
                         left: 0;
                         top: \${y}px;
-                        width: 100%;
+                        width: 100vw;
                         height: 2px;
                         background: linear-gradient(to right, 
                             rgba(0, 0, 255, 0.6) 0%, 
@@ -717,8 +717,8 @@ server.tool(
                     \`;
                     gridOverlay.appendChild(hLine);
                     
-                    // Add coordinate labels for major grid lines
-                    if (${show_coordinates} && y % (${grid_spacing} * 2) === 0 && y > 0) {
+                    // Add coordinate labels for major grid lines (including y:0)
+                    if (${show_coordinates} && y % (${grid_spacing} * 2) === 0) {
                         const label = document.createElement('div');
                         label.style.cssText = \`
                             position: absolute;
@@ -740,6 +740,28 @@ server.tool(
                     }
                 }
                 
+                // Add special origin label at (0,0) showing both coordinates
+                if (${show_coordinates}) {
+                    const originLabel = document.createElement('div');
+                    originLabel.style.cssText = \`
+                        position: absolute;
+                        left: 4px;
+                        top: 20px;
+                        color: #000;
+                        font-weight: bold;
+                        background: rgba(255, 255, 0, 0.95);
+                        border: 2px solid rgba(255, 0, 0, 0.8);
+                        padding: 3px 8px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+                        z-index: 2147483647;
+                    \`;
+                    originLabel.textContent = 'x:0, y:0';
+                    gridOverlay.appendChild(originLabel);
+                }
+                
                 // Highlight clickable elements if requested
                 if (${highlight_clickables}) {
                     const clickableSelector = 'a, button, input[type="button"], input[type="submit"], [onclick], [role="button"], [tabindex]:not([tabindex="-1"]), select, textarea, input:not([type="hidden"])';
@@ -757,24 +779,26 @@ server.tool(
                             const centerX = Math.round(rect.left + rect.width / 2);
                             const centerY = Math.round(rect.top + rect.height / 2);
                             
-                            // Add center coordinate label
+                            // Add center coordinate label - positioned like a folder tab at upper-left corner
                             const centerLabel = document.createElement('div');
                             centerLabel.className = 'mcp-center-label';
                             centerLabel.style.cssText = \`
                                 position: absolute;
-                                left: \${rect.left + window.scrollX - 45}px;
-                                top: \${rect.top + window.scrollY - 18}px;
-                                background: rgba(255, 0, 0, 0.9);
+                                left: \${rect.left + window.scrollX}px;
+                                top: \${rect.top + window.scrollY - 16}px;
+                                background: rgba(255, 0, 0, 0.95);
                                 color: white;
-                                padding: 2px 4px;
-                                border-radius: 3px;
-                                font-size: 9px;
+                                padding: 2px 6px;
+                                border-radius: 4px 4px 0 0;
+                                font-size: 10px;
                                 font-weight: bold;
                                 z-index: 2147483646;
                                 pointer-events: none;
                                 white-space: nowrap;
-                                border: 1px solid rgba(255, 255, 255, 0.3);
-                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+                                border: 2px solid rgba(255, 0, 0, 1);
+                                border-bottom: none;
+                                box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.3);
+                                transform: translateX(-1px);
                             \`;
                             centerLabel.textContent = \`center: (\${centerX},\${centerY})\`;
                             document.body.appendChild(centerLabel);
