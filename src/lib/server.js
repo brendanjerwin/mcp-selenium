@@ -522,15 +522,25 @@ server.tool(
             const actions = driver.actions({ bridge: true });
             
             if (relative_to === "viewport") {
-                // Click at absolute viewport coordinates using move with offset
+                // Move mouse to coordinates first to trigger hover states, then click
                 await actions
                     .move({ x: x, y: y })
+                    .pause(100)  // Small pause to simulate natural movement and trigger hover states
+                    .perform();
+                
+                // Then perform the click
+                await actions
                     .click()
                     .perform();
             } else {
-                // Click relative to viewport center
+                // Move mouse relative to viewport center first to trigger hover states, then click
                 await actions
                     .move({ x: x, y: y })
+                    .pause(100)  // Small pause to simulate natural movement and trigger hover states
+                    .perform();
+                    
+                // Then perform the click
+                await actions
                     .click()
                     .perform();
             }
