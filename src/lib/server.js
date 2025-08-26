@@ -391,6 +391,95 @@ server.tool(
 );
 
 server.tool(
+    "scroll",
+    "universal scrolling method that handles all scroll scenarios",
+    {
+        action: z.enum(["by_pixels", "to_position", "to_element", "to_top", "to_bottom"]).describe("Type of scroll action to perform"),
+        direction: z.enum(["up", "down", "left", "right"]).optional().describe("Direction to scroll (for by_pixels only)"),
+        amount: z.number().optional().describe("Number of pixels to scroll (for by_pixels only)"),
+        x: z.number().optional().describe("Horizontal position to scroll to (for to_position only)"),
+        y: z.number().optional().describe("Vertical position to scroll to (for to_position only)"),
+        by: z.enum(["id", "css", "xpath", "name", "tag", "class"]).optional().describe("Locator strategy to find element (for to_element only)"),
+        value: z.string().optional().describe("Value for the locator strategy (for to_element only)"),
+        behavior: z.enum(["auto", "smooth"]).optional().default("auto").describe("Scrolling behavior (auto or smooth)"),
+        block: z.enum(["start", "center", "end", "nearest"]).optional().default("start").describe("Element positioning (for to_element only)"),
+        timeout: z.number().optional().describe("Maximum time to wait for element in milliseconds (for to_element only)")
+    },
+    async ({ action, direction, amount, x, y, by, value, behavior = "auto", block = "start", timeout = 10000 }) => {
+        try {
+            const driver = getDriver();
+            
+            switch (action) {
+                case 'by_pixels': {
+                    if (!direction || amount === undefined) {
+                        throw new Error('direction and amount are required for by_pixels action');
+                    }
+                    const xOffset = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
+                    const yOffset = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
+                    await driver.executeScript(`window.scrollBy(${xOffset}, ${yOffset})`);
+                    return {
+                        content: [{ type: 'text', text: `Scrolled ${direction} by ${amount} pixels` }]
+                    };
+                }
+                
+                case 'to_position': {
+                    if (x === undefined || y === undefined) {
+                        throw new Error('x and y coordinates are required for to_position action');
+                    }
+                    await driver.executeScript(`window.scrollTo({left: ${x}, top: ${y}, behavior: '${behavior}'})`);
+                    return {
+                        content: [{ type: 'text', text: `Scrolled to position (${x}, ${y}) with ${behavior} behavior` }]
+                    };
+                }
+                
+                case 'to_element': {
+                    if (!by || !value) {
+                        throw new Error('by and value are required for to_element action');
+                    }
+                    const locator = getLocator(by, value);
+                    const element = await driver.wait(until.elementLocated(locator), timeout);
+                    await driver.executeScript(
+                        "arguments[0].scrollIntoView({behavior: arguments[1], block: arguments[2]});", 
+                        element, behavior, block
+                    );
+                    return {
+                        content: [{ type: 'text', text: `Scrolled to element (${by}=${value}) with ${behavior} behavior and ${block} positioning` }]
+                    };
+                }
+                
+                case 'to_top': {
+                    await driver.executeScript(`window.scrollTo({top: 0, left: 0, behavior: '${behavior}'})`);
+                    return {
+                        content: [{ type: 'text', text: `Scrolled to top with ${behavior} behavior` }]
+                    };
+                }
+                
+                case 'to_bottom': {
+                    await driver.executeScript(`
+                        window.scrollTo({
+                            top: document.body.scrollHeight, 
+                            left: 0, 
+                            behavior: '${behavior}'
+                        })
+                    `);
+                    return {
+                        content: [{ type: 'text', text: `Scrolled to bottom with ${behavior} behavior` }]
+                    };
+                }
+                
+                default: {
+                    throw new Error(`Unsupported scroll action: ${action}`);
+                }
+            }
+        } catch (e) {
+            return {
+                content: [{ type: 'text', text: `Error performing scroll: ${e.message}` }]
+            };
+        }
+    }
+);
+
+server.tool(
     "take_screenshot",
     "captures a screenshot of the current page",
     {
