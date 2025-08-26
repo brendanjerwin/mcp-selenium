@@ -550,23 +550,52 @@ server.tool(
     "take_screenshot",
     "captures a screenshot of the current page",
     {
-        outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data.")
+        outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data."),
+        scale: z.number().optional().default(0.5).describe("Scale percentage for resizing the image (default 0.5 = 50%)")
     },
-    async ({ outputPath }) => {
+    async ({ outputPath, scale = 0.5 }) => {
         try {
             const driver = getDriver();
             const screenshot = await driver.takeScreenshot();
+            
+            // Resize the screenshot if scale is not 1.0
+            let finalScreenshot = screenshot;
+            if (scale !== 1.0) {
+                finalScreenshot = await driver.executeScript(`
+                    return new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            const scaledWidth = Math.round(img.width * ${scale});
+                            const scaledHeight = Math.round(img.height * ${scale});
+                            
+                            canvas.width = scaledWidth;
+                            canvas.height = scaledHeight;
+                            
+                            ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+                            
+                            // Convert to base64
+                            const base64 = canvas.toDataURL('image/png').split(',')[1];
+                            resolve(base64);
+                        };
+                        img.src = 'data:image/png;base64,' + arguments[0];
+                    });
+                `, screenshot);
+            }
+            
             if (outputPath) {
                 const fs = await import('fs');
-                await fs.promises.writeFile(outputPath, screenshot, 'base64');
+                await fs.promises.writeFile(outputPath, finalScreenshot, 'base64');
                 return {
-                    content: [{ type: 'text', text: `Screenshot saved to ${outputPath}` }]
+                    content: [{ type: 'text', text: `Screenshot saved to ${outputPath} (scale: ${Math.round(scale * 100)}%)` }]
                 };
             } else {
                 return {
                     content: [
-                        { type: 'text', text: 'Screenshot captured as base64:' },
-                        { type: 'text', text: screenshot }
+                        { type: 'text', text: `Screenshot captured as base64 (scale: ${Math.round(scale * 100)}%):` },
+                        { type: 'text', text: finalScreenshot }
                     ]
                 };
             }
@@ -586,9 +615,10 @@ server.tool(
         show_coordinates: z.boolean().optional().default(true).describe("Show coordinate labels at grid intersections"),
         highlight_clickables: z.boolean().optional().default(true).describe("Highlight interactive elements with colored borders"),
         number_elements: z.boolean().optional().default(false).describe("Add numbers to clickable elements"),
-        outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data.")
+        outputPath: z.string().optional().describe("Optional path where to save the screenshot. If not provided, returns base64 data."),
+        scale: z.number().optional().default(0.5).describe("Scale percentage for resizing the image (default 0.5 = 50%)")
     },
-    async ({ grid_spacing = 50, show_coordinates = true, highlight_clickables = true, number_elements = false, outputPath }) => {
+    async ({ grid_spacing = 50, show_coordinates = true, highlight_clickables = true, number_elements = false, outputPath, scale = 0.5 }) => {
         try {
             const driver = getDriver();
             
@@ -610,7 +640,7 @@ server.tool(
                     width: 100%;
                     height: 100%;
                     pointer-events: none;
-                    z-index: 999999;
+                    z-index: 2147483647;
                     font-family: monospace;
                     font-size: 10px;
                 \`;
@@ -625,9 +655,14 @@ server.tool(
                         position: absolute;
                         left: \${x}px;
                         top: 0;
-                        width: 1px;
+                        width: 2px;
                         height: 100%;
-                        background: rgba(0, 0, 255, 0.3);
+                        background: linear-gradient(to bottom, 
+                            rgba(0, 0, 255, 0.6) 0%, 
+                            rgba(255, 255, 255, 0.8) 50%, 
+                            rgba(0, 0, 0, 0.6) 100%);
+                        border-left: 1px solid rgba(255, 255, 255, 0.8);
+                        border-right: 1px solid rgba(0, 0, 0, 0.6);
                     \`;
                     gridOverlay.appendChild(vLine);
                     
@@ -636,16 +671,18 @@ server.tool(
                         const label = document.createElement('div');
                         label.style.cssText = \`
                             position: absolute;
-                            left: \${x + 2}px;
+                            left: \${x + 4}px;
                             top: 2px;
-                            color: blue;
+                            color: #000;
                             font-weight: bold;
-                            background: rgba(255, 255, 255, 0.8);
-                            padding: 1px 3px;
-                            border-radius: 2px;
+                            background: rgba(255, 255, 255, 0.95);
+                            border: 1px solid rgba(0, 0, 0, 0.3);
+                            padding: 2px 4px;
+                            border-radius: 3px;
                             font-size: 10px;
+                            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
                         \`;
-                        label.textContent = x;
+                        label.textContent = 'x:' + x;
                         gridOverlay.appendChild(label);
                     }
                 }
@@ -658,8 +695,13 @@ server.tool(
                         left: 0;
                         top: \${y}px;
                         width: 100%;
-                        height: 1px;
-                        background: rgba(0, 0, 255, 0.3);
+                        height: 2px;
+                        background: linear-gradient(to right, 
+                            rgba(0, 0, 255, 0.6) 0%, 
+                            rgba(255, 255, 255, 0.8) 50%, 
+                            rgba(0, 0, 0, 0.6) 100%);
+                        border-top: 1px solid rgba(255, 255, 255, 0.8);
+                        border-bottom: 1px solid rgba(0, 0, 0, 0.6);
                     \`;
                     gridOverlay.appendChild(hLine);
                     
@@ -669,15 +711,17 @@ server.tool(
                         label.style.cssText = \`
                             position: absolute;
                             left: 2px;
-                            top: \${y + 2}px;
-                            color: blue;
+                            top: \${y + 4}px;
+                            color: #000;
                             font-weight: bold;
-                            background: rgba(255, 255, 255, 0.8);
-                            padding: 1px 3px;
-                            border-radius: 2px;
+                            background: rgba(255, 255, 255, 0.95);
+                            border: 1px solid rgba(0, 0, 0, 0.3);
+                            padding: 2px 4px;
+                            border-radius: 3px;
                             font-size: 10px;
+                            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
                         \`;
-                        label.textContent = y;
+                        label.textContent = 'y:' + y;
                         gridOverlay.appendChild(label);
                     }
                 }
@@ -694,6 +738,31 @@ server.tool(
                             const originalOutline = el.style.outline;
                             el.style.outline = '2px solid rgba(255, 0, 0, 0.7)';
                             el.setAttribute('data-mcp-original-outline', originalOutline);
+                            
+                            // Calculate center coordinates
+                            const centerX = Math.round(rect.left + rect.width / 2);
+                            const centerY = Math.round(rect.top + rect.height / 2);
+                            
+                            // Add center coordinate label
+                            const centerLabel = document.createElement('div');
+                            centerLabel.className = 'mcp-center-label';
+                            centerLabel.style.cssText = \`
+                                position: absolute;
+                                left: \${rect.left + window.scrollX - 45}px;
+                                top: \${rect.top + window.scrollY - 18}px;
+                                background: rgba(0, 0, 0, 0.9);
+                                color: white;
+                                padding: 2px 4px;
+                                border-radius: 3px;
+                                font-size: 9px;
+                                font-weight: bold;
+                                z-index: 2147483646;
+                                pointer-events: none;
+                                white-space: nowrap;
+                                border: 1px solid rgba(255, 255, 255, 0.3);
+                            \`;
+                            centerLabel.textContent = \`center: (\${centerX},\${centerY})\`;
+                            document.body.appendChild(centerLabel);
                             
                             // Add element numbers if requested
                             if (${number_elements}) {
@@ -713,7 +782,7 @@ server.tool(
                                     justify-content: center;
                                     font-size: 10px;
                                     font-weight: bold;
-                                    z-index: 1000000;
+                                    z-index: 2147483645;
                                     pointer-events: none;
                                 \`;
                                 numberLabel.textContent = index + 1;
@@ -733,6 +802,33 @@ server.tool(
             // Take screenshot with grid overlay
             const screenshot = await driver.takeScreenshot();
             
+            // Resize the screenshot if scale is not 1.0
+            let finalScreenshot = screenshot;
+            if (scale !== 1.0) {
+                finalScreenshot = await driver.executeScript(`
+                    return new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            const scaledWidth = Math.round(img.width * ${scale});
+                            const scaledHeight = Math.round(img.height * ${scale});
+                            
+                            canvas.width = scaledWidth;
+                            canvas.height = scaledHeight;
+                            
+                            ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+                            
+                            // Convert to base64
+                            const base64 = canvas.toDataURL('image/png').split(',')[1];
+                            resolve(base64);
+                        };
+                        img.src = 'data:image/png;base64,' + arguments[0];
+                    });
+                `, screenshot);
+            }
+            
             // Clean up the grid overlay and element highlighting
             const cleanupScript = `
                 // Remove grid overlay
@@ -748,6 +844,10 @@ server.tool(
                     el.removeAttribute('data-mcp-original-outline');
                 });
                 
+                // Remove center coordinate labels
+                const centerLabels = document.querySelectorAll('.mcp-center-label');
+                centerLabels.forEach(label => label.remove());
+                
                 // Remove element number labels
                 const numberLabels = document.querySelectorAll('.mcp-element-number');
                 numberLabels.forEach(label => label.remove());
@@ -759,11 +859,11 @@ server.tool(
             
             if (outputPath) {
                 const fs = await import('fs');
-                await fs.promises.writeFile(outputPath, screenshot, 'base64');
+                await fs.promises.writeFile(outputPath, finalScreenshot, 'base64');
                 return {
                     content: [{ 
                         type: 'text', 
-                        text: `Grid screenshot saved to ${outputPath} (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements})` 
+                        text: `Grid screenshot saved to ${outputPath} (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements}, scale: ${Math.round(scale * 100)}%)` 
                     }]
                 };
             } else {
@@ -771,9 +871,9 @@ server.tool(
                     content: [
                         { 
                             type: 'text', 
-                            text: `Grid screenshot captured (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements}):` 
+                            text: `Grid screenshot captured (grid_spacing: ${grid_spacing}px, coordinates: ${show_coordinates}, clickables: ${highlight_clickables}, numbered: ${number_elements}, scale: ${Math.round(scale * 100)}%):` 
                         },
-                        { type: 'text', text: screenshot }
+                        { type: 'text', text: finalScreenshot }
                     ]
                 };
             }
