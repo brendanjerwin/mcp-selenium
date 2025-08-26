@@ -381,6 +381,91 @@ Simulates pressing a keyboard key.
 }
 ```
 
+### scroll
+Universal scrolling method that handles all scroll scenarios through different parameter combinations.
+
+**Parameters:**
+- `action` (required): Type of scroll action to perform
+  - Type: string
+  - Enum: ["by_pixels", "to_position", "to_element", "to_top", "to_bottom"]
+- `direction`: Direction to scroll (for by_pixels only)
+  - Type: string
+  - Enum: ["up", "down", "left", "right"]
+- `amount`: Number of pixels to scroll (for by_pixels only)
+  - Type: number
+- `x`: Horizontal position to scroll to (for to_position only)
+  - Type: number
+- `y`: Vertical position to scroll to (for to_position only)
+  - Type: number
+- `by`: Locator strategy to find element (for to_element only)
+  - Type: string
+  - Enum: ["id", "css", "xpath", "name", "tag", "class"]
+- `value`: Value for the locator strategy (for to_element only)
+  - Type: string
+- `behavior`: Scrolling behavior
+  - Type: string
+  - Enum: ["auto", "smooth"]
+  - Default: "auto"
+- `block`: Element positioning (for to_element only)
+  - Type: string
+  - Enum: ["start", "center", "end", "nearest"]
+  - Default: "start"
+- `timeout`: Maximum time to wait for element in milliseconds (for to_element only)
+  - Type: number
+  - Default: 10000
+
+**Examples:**
+```json
+// Scroll down 500 pixels
+{
+  "tool": "scroll",
+  "parameters": {
+    "action": "by_pixels",
+    "direction": "down",
+    "amount": 500
+  }
+}
+
+// Smooth scroll to coordinates
+{
+  "tool": "scroll",
+  "parameters": {
+    "action": "to_position",
+    "x": 0,
+    "y": 1000,
+    "behavior": "smooth"
+  }
+}
+
+// Scroll to element
+{
+  "tool": "scroll",
+  "parameters": {
+    "action": "to_element",
+    "by": "id",
+    "value": "footer",
+    "behavior": "smooth"
+  }
+}
+
+// Scroll to top
+{
+  "tool": "scroll",
+  "parameters": {
+    "action": "to_top",
+    "behavior": "smooth"
+  }
+}
+
+// Scroll to bottom
+{
+  "tool": "scroll",
+  "parameters": {
+    "action": "to_bottom"
+  }
+}
+```
+
 ### upload_file
 Uploads a file using a file input element.
 
