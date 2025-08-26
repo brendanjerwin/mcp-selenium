@@ -510,6 +510,78 @@ Captures a screenshot of the current page.
 }
 ```
 
+### take_grid_screenshot
+Captures a screenshot with coordinate grid overlay for visual reference and element targeting.
+
+**Parameters:**
+- `grid_spacing`: Pixels between grid lines
+  - Type: number
+  - Default: 50
+- `show_coordinates`: Show coordinate labels at grid intersections
+  - Type: boolean
+  - Default: true
+- `highlight_clickables`: Highlight interactive elements with colored borders
+  - Type: boolean
+  - Default: true
+- `number_elements`: Add numbers to clickable elements for easy reference
+  - Type: boolean
+  - Default: false
+- `outputPath` (optional): Path where to save the screenshot. If not provided, returns base64 data.
+  - Type: string
+
+**Example:**
+```json
+{
+  "tool": "take_grid_screenshot",
+  "parameters": {
+    "grid_spacing": 50,
+    "show_coordinates": true,
+    "highlight_clickables": true,
+    "number_elements": true,
+    "outputPath": "/path/to/grid_screenshot.png"
+  }
+}
+```
+
+### click_at_coordinates
+Clicks at specific x,y coordinates on the viewport, enabling precise coordinate-based interactions.
+
+**Parameters:**
+- `x` (required): X coordinate (horizontal position in pixels)
+  - Type: number
+- `y` (required): Y coordinate (vertical position in pixels)
+  - Type: number
+- `relative_to`: Coordinate reference point
+  - Type: string
+  - Enum: ["viewport", "center"]
+  - Default: "viewport"
+- `scroll_if_needed`: Auto-scroll if coordinates are outside viewport
+  - Type: boolean
+  - Default: true
+
+**Examples:**
+```json
+// Click at absolute viewport coordinates
+{
+  "tool": "click_at_coordinates",
+  "parameters": {
+    "x": 250,
+    "y": 150,
+    "relative_to": "viewport"
+  }
+}
+
+// Click relative to viewport center
+{
+  "tool": "click_at_coordinates",
+  "parameters": {
+    "x": -50,
+    "y": 25,
+    "relative_to": "center"
+  }
+}
+```
+
 ### close_session
 Closes the current browser session and cleans up resources.
 
