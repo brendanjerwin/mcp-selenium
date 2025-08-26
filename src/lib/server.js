@@ -842,7 +842,7 @@ server.tool(
                                 box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.3);
                                 transform: translateX(-1px);
                             \`;
-                            centerLabel.textContent = \`center: (\${centerX},\${centerY})\`;
+                            centerLabel.textContent = \`x: \${centerX}, y: \${centerY}\`;
                             document.body.appendChild(centerLabel);
                         }
                     });
