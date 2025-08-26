@@ -727,80 +727,84 @@ server.tool(
                 const showCoordinates = ${target_identification_mode === "coordinates"};
                 const highlightClickables = ${target_identification_mode === "highlights"};
                 
-                // Add vertical grid lines - ensure they fill the entire viewport
-                for (let x = 0; x <= viewportWidth; x += ${grid_spacing}) {
-                    const vLine = document.createElement('div');
-                    vLine.style.cssText = \`
-                        position: absolute;
-                        left: \${x}px;
-                        top: 0;
-                        width: 2px;
-                        height: 100vh;
-                        background: rgba(0, 0, 255, 0.6);
-                        border-left: 1px solid rgba(255, 255, 255, 0.8);
-                        border-right: 1px solid rgba(0, 0, 0, 0.6);
-                    \`;
-                    gridOverlay.appendChild(vLine);
-                    
-                    // Add coordinate labels for major grid lines
-                    if (showCoordinates && x % (${grid_spacing} * 2) === 0) {
-                        const label = document.createElement('div');
-                        label.style.cssText = \`
+                // Add vertical grid lines - only in coordinates mode
+                if (showCoordinates) {
+                    for (let x = 0; x <= viewportWidth; x += ${grid_spacing}) {
+                        const vLine = document.createElement('div');
+                        vLine.style.cssText = \`
                             position: absolute;
-                            left: \${x + 4}px;
-                            top: 2px;
-                            color: #000;
-                            font-weight: bold;
-                            background: rgba(255, 255, 255, 0.95);
-                            border: 1px solid rgba(0, 0, 0, 0.5);
-                            padding: 2px 6px;
-                            border-radius: 3px;
-                            font-size: 11px;
-                            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
-                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-                            z-index: 2147483647;
+                            left: \${x}px;
+                            top: 0;
+                            width: 2px;
+                            height: 100vh;
+                            background: rgba(0, 0, 255, 0.6);
+                            border-left: 1px solid rgba(255, 255, 255, 0.8);
+                            border-right: 1px solid rgba(0, 0, 0, 0.6);
                         \`;
-                        label.textContent = 'x:' + x;
-                        gridOverlay.appendChild(label);
+                        gridOverlay.appendChild(vLine);
+                        
+                        // Add coordinate labels for major grid lines
+                        if (x % (${grid_spacing} * 2) === 0) {
+                            const label = document.createElement('div');
+                            label.style.cssText = \`
+                                position: absolute;
+                                left: \${x + 4}px;
+                                top: 2px;
+                                color: #000;
+                                font-weight: bold;
+                                background: rgba(255, 255, 255, 0.95);
+                                border: 1px solid rgba(0, 0, 0, 0.5);
+                                padding: 2px 6px;
+                                border-radius: 3px;
+                                font-size: 11px;
+                                text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
+                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+                                z-index: 2147483647;
+                            \`;
+                            label.textContent = 'x:' + x;
+                            gridOverlay.appendChild(label);
+                        }
                     }
                 }
                 
-                // Add horizontal grid lines - ensure they fill the entire viewport
-                for (let y = 0; y <= viewportHeight; y += ${grid_spacing}) {
-                    const hLine = document.createElement('div');
-                    hLine.style.cssText = \`
-                        position: absolute;
-                        left: 0;
-                        top: \${y}px;
-                        width: 100vw;
-                        height: 2px;
-                        background: rgba(0, 0, 255, 0.6);
-                        border-top: 1px solid rgba(255, 255, 255, 0.8);
-                        border-bottom: 1px solid rgba(0, 0, 0, 0.6);
-                    \`;
-                    gridOverlay.appendChild(hLine);
-                    
-                    // Add coordinate labels for major grid lines (including y:0)
-                    if (showCoordinates && y % (${grid_spacing} * 2) === 0) {
-                        const label = document.createElement('div');
-                        label.style.cssText = \`
+                // Add horizontal grid lines - only in coordinates mode
+                if (showCoordinates) {
+                    for (let y = 0; y <= viewportHeight; y += ${grid_spacing}) {
+                        const hLine = document.createElement('div');
+                        hLine.style.cssText = \`
                             position: absolute;
-                            left: 2px;
-                            top: \${y + 4}px;
-                            color: #000;
-                            font-weight: bold;
-                            background: rgba(255, 255, 255, 0.95);
-                            border: 1px solid rgba(0, 0, 0, 0.5);
-                            padding: 2px 6px;
-                            border-radius: 3px;
-                            font-size: 11px;
-                            text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
-                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-                            z-index: 2147483647;
+                            left: 0;
+                            top: \${y}px;
+                            width: 100vw;
+                            height: 2px;
+                            background: rgba(0, 0, 255, 0.6);
+                            border-top: 1px solid rgba(255, 255, 255, 0.8);
+                            border-bottom: 1px solid rgba(0, 0, 0, 0.6);
                         \`;
-                        // Make origin label exactly like normal case labels, just with different content
-                        label.textContent = (y === 0) ? 'x:0, y:0' : 'y:' + y;
-                        gridOverlay.appendChild(label);
+                        gridOverlay.appendChild(hLine);
+                        
+                        // Add coordinate labels for major grid lines (including y:0)
+                        if (y % (${grid_spacing} * 2) === 0) {
+                            const label = document.createElement('div');
+                            label.style.cssText = \`
+                                position: absolute;
+                                left: 2px;
+                                top: \${y + 4}px;
+                                color: #000;
+                                font-weight: bold;
+                                background: rgba(255, 255, 255, 0.95);
+                                border: 1px solid rgba(0, 0, 0, 0.5);
+                                padding: 2px 6px;
+                                border-radius: 3px;
+                                font-size: 11px;
+                                text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8);
+                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+                                z-index: 2147483647;
+                            \`;
+                            // Make origin label exactly like normal case labels, just with different content
+                            label.textContent = (y === 0) ? 'x:0, y:0' : 'y:' + y;
+                            gridOverlay.appendChild(label);
+                        }
                     }
                 }
                 
