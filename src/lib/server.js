@@ -457,7 +457,7 @@ server.tool(
                 case 'to_bottom': {
                     await driver.executeScript(`
                         window.scrollTo({
-                            top: document.body.scrollHeight, 
+                            top: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight), 
                             left: 0, 
                             behavior: '${behavior}'
                         })
