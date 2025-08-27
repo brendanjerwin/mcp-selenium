@@ -535,9 +535,7 @@ Captures a screenshot with coordinate grid overlay for visual reference and elem
   "tool": "take_grid_screenshot",
   "parameters": {
     "grid_spacing": 50,
-    "show_coordinates": true,
-    "highlight_clickables": true,
-    "number_elements": true,
+    "target_identification_mode": "coordinates",
     "outputPath": "/path/to/grid_screenshot.png"
   }
 }
