@@ -517,15 +517,10 @@ Captures a screenshot with coordinate grid overlay for visual reference and elem
 - `grid_spacing`: Pixels between grid lines
   - Type: number
   - Default: 50
-- `show_coordinates`: Show coordinate labels at grid intersections
-  - Type: boolean
-  - Default: true
-- `highlight_clickables`: Highlight interactive elements with colored borders
-  - Type: boolean
-  - Default: true
-- `number_elements`: Add numbers to clickable elements for easy reference
-  - Type: boolean
-  - Default: false
+- `target_identification_mode`: Overlay mode for element targeting and grid display
+  - Type: string (enum)
+  - Enum: ["coordinates", "clickables", "numbered_elements"]
+  - Default: "coordinates"
 - `outputPath` (optional): Path where to save the screenshot. If not provided, returns base64 data.
   - Type: string
 
